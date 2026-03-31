@@ -50,6 +50,7 @@ jobs:
           cat $GITHUB_EVENT_PATH | jq '.inputs'
 
       - name: Set up GPG key
+        if: env.CI_GPG_PRIVATE_KEY != ''
         id: signing_setup
         run: |
           echo "${{ env.CI_GPG_PRIVATE_KEY }}" | gpg --batch --import
