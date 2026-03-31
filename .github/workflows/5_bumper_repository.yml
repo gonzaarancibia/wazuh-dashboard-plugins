@@ -61,14 +61,22 @@ jobs:
         run: |
           git config --global user.name "${{ env.CI_COMMIT_AUTHOR }}"
           git config --global user.email "${{ env.CI_COMMIT_EMAIL }}"
-          git config --global commit.gpgsign true
-          git config --global user.signingkey "${{ steps.signing_setup.outputs.gpg_key_id }}"
-          echo "use-agent" >> ~/.gnupg/gpg.conf
-          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
-          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
-          echo RELOADAGENT | gpg-connect-agent
+
+          if [[ -n "${{ env.CI_GPG_PRIVATE_KEY }}" ]]; then
+            git config --global commit.gpgsign true
+            git config --global user.signingkey "${{ steps.signing_setup.outputs.gpg_key_id }}"
+
+            mkdir -p ~/.gnupg
+            echo "use-agent" >> ~/.gnupg/gpg.conf
+            echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+            echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+            echo RELOADAGENT | gpg-connect-agent
+            export GPG_TTY=$(tty)
+          else
+            echo "Skipping GPG setup (no key)."
+            git config --global commit.gpgsign false
+          fi
           export DEBIAN_FRONTEND=noninteractive
-          export GPG_TTY=$(tty)
 
       - name: Checkout repository
         uses: actions/checkout@v4
