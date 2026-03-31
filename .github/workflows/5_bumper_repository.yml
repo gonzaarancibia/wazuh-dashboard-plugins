@@ -130,19 +130,37 @@ jobs:
       - name: Check for changes
         id: check_changes
         run: |
-          if [[ -z "$(git status --porcelain)" ]]; then
+          if [[ -n "${{ secrets.CI_WAZUHCI_BUMPER_TOKEN }}" ]]; then
+            CHANGES=$(git status --porcelain)
+          else
+            # Fork fallback: skip workflow-file changes because default token lacks workflows scope.
+            CHANGES=$(git status --porcelain -- . ':(exclude).github/workflows/**')
+          fi
+
+          if [[ -z "$CHANGES" ]]; then
             echo "has_changes=false" >> $GITHUB_OUTPUT
             echo "No changes detected - no-op"
           else
             echo "has_changes=true" >> $GITHUB_OUTPUT
             echo "Changes detected"
-            git status --porcelain
+            echo "$CHANGES"
           fi
 
       - name: Commit and push changes
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
-          git add .
+          if [[ -n "${{ secrets.CI_WAZUHCI_BUMPER_TOKEN }}" ]]; then
+            git add .
+          else
+            # Fork fallback: avoid staging workflow files that require workflows permission on push.
+            git add -A -- . ':(exclude).github/workflows/**'
+          fi
+
+          if git diff --cached --quiet; then
+            echo "No commitable changes after permission-safe filtering"
+            exit 0
+          fi
+
           git commit -m "feat: bump ${{ github.ref_name }}"
           git push origin ${{ steps.vars.outputs.branch_name }}
 
