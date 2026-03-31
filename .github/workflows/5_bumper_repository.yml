@@ -45,7 +45,7 @@ jobs:
       CI_COMMIT_AUTHOR: wazuhci
       CI_COMMIT_EMAIL: 22834044+wazuhci@users.noreply.github.com
       CI_GPG_PRIVATE_KEY: ${{ secrets.CI_WAZUHCI_GPG_PRIVATE }}
-      GH_TOKEN: ${{ secrets.CI_WAZUHCI_BUMPER_TOKEN }}
+      GH_TOKEN: ${{ secrets.CI_WAZUHCI_BUMPER_TOKEN || github.token }}
       BUMP_SCRIPT_PATH: tools/repository_bumper.sh
       BUMP_LOG_PATH: tools/
 
@@ -56,6 +56,7 @@ jobs:
 
       - name: Set up GPG key
         id: signing_setup
+        if: env.CI_GPG_PRIVATE_KEY != ''
         run: |
           echo "${{ env.CI_GPG_PRIVATE_KEY }}" | gpg --batch --import
           KEY_ID=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec/ {print $5; exit}')
@@ -65,12 +66,16 @@ jobs:
         run: |
           git config --global user.name "${{ env.CI_COMMIT_AUTHOR }}"
           git config --global user.email "${{ env.CI_COMMIT_EMAIL }}"
-          git config --global commit.gpgsign true
-          git config --global user.signingkey "${{ steps.signing_setup.outputs.gpg_key_id }}"
-          echo "use-agent" >> ~/.gnupg/gpg.conf
-          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
-          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
-          echo RELOADAGENT | gpg-connect-agent
+          if [[ -n "${{ env.CI_GPG_PRIVATE_KEY }}" ]]; then
+            git config --global commit.gpgsign true
+            git config --global user.signingkey "${{ steps.signing_setup.outputs.gpg_key_id }}"
+            echo "use-agent" >> ~/.gnupg/gpg.conf
+            echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+            echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+            echo RELOADAGENT | gpg-connect-agent
+          else
+            git config --global commit.gpgsign false
+          fi
           export DEBIAN_FRONTEND=noninteractive
           export GPG_TTY=$(tty)
 
@@ -158,8 +163,12 @@ jobs:
       - name: Merge pull request
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
-          # Any checks for the PR are bypassed since the branch is expected to be functional (i.e. the bump process does not introduce any bugs)
-          gh pr merge "${{ steps.create_pr.outputs.pull_request_url }}" --merge --admin
+          # In upstream repos we can force admin merge; in forks fall back to regular merge.
+          if [[ -n "${{ secrets.CI_WAZUHCI_BUMPER_TOKEN }}" ]]; then
+            gh pr merge "${{ steps.create_pr.outputs.pull_request_url }}" --merge --admin
+          else
+            gh pr merge "${{ steps.create_pr.outputs.pull_request_url }}" --merge
+          fi
 
       - name: Show logs
         run: |
