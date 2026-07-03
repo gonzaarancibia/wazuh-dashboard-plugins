@@ -115,3 +115,5 @@ version 2 of the License, or (at your option) any later version.
 [slack]: https://join.slack.com/t/wazuh/shared_invite/zt-1lgu531ur-7M_k_ZQbpdo4QCn_pHee3w
 [branches]: https://github.com/wazuh/wazuh-dashboard-plugins/wiki/About-our-branches-and-tags
 [wiki]: https://github.com/wazuh/wazuh-dashboard-plugins/wiki
+
+
